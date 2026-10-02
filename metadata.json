@@ -1,0 +1,6 @@
+{
+  "name": "Cambus G0 — Live Transit",
+  "description": "College transport, clearly connected. Real-time college bus tracking system with live GPS navigation, dynamic ETA, student arrival alerts, driver trip console, and fleet operations.",
+  "requestFramePermissions": ["geolocation"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
