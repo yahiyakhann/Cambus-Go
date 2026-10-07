@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTransport } from '../context/TransportContext';
 import { CampusMap } from './CampusMap';
 import { VehicleCondition } from '../types';
@@ -14,6 +14,9 @@ import {
   X,
   Plus,
   Minus,
+  Smartphone,
+  AlertTriangle,
+  CheckCircle2,
 } from 'lucide-react';
 
 export const DriverView: React.FC = () => {
@@ -27,10 +30,13 @@ export const DriverView: React.FC = () => {
     setPassengerCount,
     reportVehicleIssue,
     triggerEmergency,
+    updateBusDetails,
   } = useTransport();
 
   const [showIssueModal, setShowIssueModal] = useState<boolean>(false);
   const [showEmergencyConfirm, setShowEmergencyConfirm] = useState<boolean>(false);
+  const [deviceGpsActive, setDeviceGpsActive] = useState<boolean>(false);
+  const [gpsMessage, setGpsMessage] = useState<{ text: string; isError: boolean } | null>(null);
 
   const assignedBus = buses.find((b) => b.id === driver.assignedBusId) || buses[0];
   const assignedRoute = routes.find((r) => r.id === assignedBus.routeId) || routes[0];
@@ -38,6 +44,64 @@ export const DriverView: React.FC = () => {
   const isTripActive = assignedBus.isTripActive;
   const isEmergency = assignedBus.status === 'emergency';
   const nextStop = assignedRoute.stops[assignedBus.currentStopIndex] || assignedRoute.stops[0];
+  const isGpsStale = Date.now() - assignedBus.lastUpdated > 30000;
+
+  // Real device GPS emitter with permission error handling
+  useEffect(() => {
+    let watchId: number | null = null;
+    if (deviceGpsActive && typeof navigator !== 'undefined' && navigator.geolocation) {
+      watchId = navigator.geolocation.watchPosition(
+        (pos) => {
+          updateBusDetails(assignedBus.id, {
+            latitude: pos.coords.latitude,
+            longitude: pos.coords.longitude,
+            speedKmh: Math.round((pos.coords.speed || 0) * 3.6) || 28,
+            lastUpdated: Date.now(),
+          });
+          setGpsMessage({ text: 'Transmitting phone GPS coordinates live', isError: false });
+        },
+        (err) => {
+          setDeviceGpsActive(false);
+          if (err.code === 1) {
+            setGpsMessage({
+              text: 'Location permission denied by browser. Switched back to simulated route GPS.',
+              isError: true,
+            });
+          } else {
+            setGpsMessage({
+              text: 'Could not acquire phone GPS fix. Running on route polyline sync.',
+              isError: true,
+            });
+          }
+        },
+        { enableHighAccuracy: true, timeout: 10000 }
+      );
+    }
+
+    return () => {
+      if (watchId !== null && typeof navigator !== 'undefined') {
+        navigator.geolocation.clearWatch(watchId);
+      }
+    };
+  }, [deviceGpsActive, assignedBus.id]);
+
+  const toggleDeviceGps = () => {
+    setGpsMessage(null);
+    if (!deviceGpsActive) {
+      if (typeof navigator === 'undefined' || !navigator.geolocation) {
+        setGpsMessage({
+          text: 'Geolocation API is not available on this browser/environment.',
+          isError: true,
+        });
+        return;
+      }
+      setDeviceGpsActive(true);
+    } else {
+      setDeviceGpsActive(false);
+      setGpsMessage({ text: 'Phone GPS emitter turned off. Resumed route simulation.', isError: false });
+      setTimeout(() => setGpsMessage(null), 3000);
+    }
+  };
 
   const handleIssueSelect = (condition: VehicleCondition) => {
     reportVehicleIssue(assignedBus.id, condition);
@@ -87,12 +151,53 @@ export const DriverView: React.FC = () => {
             </p>
           </div>
 
-          {/* GPS Status Indicator */}
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-teal-50 border border-teal-200 text-teal-800 text-xs font-bold">
-            <span className="w-2.5 h-2.5 rounded-full bg-teal-600 animate-pulse" />
-            <span>GPS Connected</span>
+          {/* GPS Status & Transmitter Toggle */}
+          <div className="flex flex-wrap items-center gap-2">
+            {isGpsStale ? (
+              <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-100 border border-amber-300 text-amber-900 text-xs font-bold">
+                <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
+                <span>GPS Stale (&gt;30s)</span>
+              </div>
+            ) : (
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-teal-50 border border-teal-200 text-teal-800 text-xs font-bold">
+                <span className="w-2.5 h-2.5 rounded-full bg-teal-600 animate-pulse" />
+                <span>GPS Connected</span>
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={toggleDeviceGps}
+              className={`px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-1.5 border transition-all cursor-pointer ${
+                deviceGpsActive
+                  ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
+                  : 'bg-slate-100 text-slate-700 border-slate-300 hover:bg-slate-200'
+              }`}
+              title="Use Phone's Hardware GPS Sensor"
+            >
+              <Smartphone className="w-3.5 h-3.5" />
+              <span>{deviceGpsActive ? 'Phone GPS Broadcasting' : 'Transmit Phone GPS'}</span>
+            </button>
           </div>
         </div>
+
+        {/* GPS Sensor Alert or Permission Denied Message */}
+        {gpsMessage && (
+          <div
+            className={`p-3 rounded-xl border text-xs flex items-center gap-2 ${
+              gpsMessage.isError
+                ? 'bg-amber-50 border-amber-200 text-amber-900'
+                : 'bg-teal-50 border-teal-200 text-teal-800'
+            }`}
+          >
+            {gpsMessage.isError ? (
+              <AlertTriangle className="w-4 h-4 shrink-0 text-amber-600" />
+            ) : (
+              <CheckCircle2 className="w-4 h-4 shrink-0 text-teal-600" />
+            )}
+            <span>{gpsMessage.text}</span>
+          </div>
+        )}
 
         {/* Next Stop Callout */}
         <div className="bg-slate-50/90 border border-slate-200 rounded-xl p-4">

@@ -493,6 +493,32 @@ export const CampusMap: React.FC<CampusMapProps> = ({
                     {bus.busNumber} • {bus.speedKmh} km/h
                   </text>
                 </g>
+
+                {/* Stale GPS Telemetry Badge if older than 30s */}
+                {Date.now() - bus.lastUpdated > 30000 && (
+                  <g transform="translate(0, 17)">
+                    <rect
+                      x="-24"
+                      y="-7"
+                      width="48"
+                      height="13"
+                      rx="6.5"
+                      fill="#fef3c7"
+                      stroke="#d97706"
+                      strokeWidth="1"
+                    />
+                    <text
+                      x="0"
+                      y="2.5"
+                      textAnchor="middle"
+                      fill="#92400e"
+                      fontSize="6"
+                      fontWeight="bold"
+                    >
+                      STALE GPS
+                    </text>
+                  </g>
+                )}
               </g>
             );
           })}

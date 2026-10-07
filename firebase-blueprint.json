@@ -1,0 +1,53 @@
+{
+  "entities": {
+    "users": {
+      "fields": {
+        "displayName": { "type": "string" },
+        "email": { "type": "string" },
+        "role": { "type": "string" },
+        "phone": { "type": "string" },
+        "department": { "type": "string" },
+        "assignedBusNumber": { "type": "string" },
+        "createdAt": { "type": "number" },
+        "status": { "type": "string" }
+      }
+    },
+    "buses": {
+      "fields": {
+        "busNumber": { "type": "string" },
+        "registrationNumber": { "type": "string" },
+        "routeId": { "type": "string" },
+        "driverId": { "type": "string" },
+        "driverName": { "type": "string" },
+        "latitude": { "type": "number" },
+        "longitude": { "type": "number" },
+        "speedKmh": { "type": "number" },
+        "heading": { "type": "number" },
+        "progress": { "type": "number" },
+        "status": { "type": "string" },
+        "lastUpdated": { "type": "number" },
+        "isTripActive": { "type": "boolean" }
+      }
+    },
+    "system_config": {
+      "fields": {
+        "systemName": { "type": "string" },
+        "campusCenterLat": { "type": "number" },
+        "campusCenterLng": { "type": "number" },
+        "emergencyContactPhone": { "type": "string" },
+        "announcementBanner": { "type": "string" }
+      }
+    },
+    "alerts": {
+      "fields": {
+        "busId": { "type": "string" },
+        "busNumber": { "type": "string" },
+        "type": { "type": "string" },
+        "title": { "type": "string" },
+        "message": { "type": "string" },
+        "timestamp": { "type": "number" },
+        "resolved": { "type": "boolean" }
+      }
+    }
+  }
+}

@@ -1,21 +1,56 @@
 import { PathPoint, RouteStop } from '../types';
 
+export const CAMPUS_CENTER_LAT = 17.385;
+export const CAMPUS_CENTER_LNG = 78.4867;
+
+/**
+ * Validates whether given coordinates are numeric, non-NaN, and within real earthly boundaries.
+ */
+export function isValidCoordinate(lat: unknown, lng: unknown): boolean {
+  if (typeof lat !== 'number' || typeof lng !== 'number') return false;
+  if (Number.isNaN(lat) || Number.isNaN(lng)) return false;
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return false;
+  if (lat < -90 || lat > 90) return false;
+  if (lng < -180 || lng > 180) return false;
+  return true;
+}
+
+/**
+ * Safely sanitizes coordinates with sensible campus fallback defaults.
+ */
+export function sanitizeCoordinate(
+  lat: unknown,
+  lng: unknown,
+  fallbackLat: number = CAMPUS_CENTER_LAT,
+  fallbackLng: number = CAMPUS_CENTER_LNG
+): { lat: number; lng: number } {
+  const safeLat = typeof lat === 'number' && !Number.isNaN(lat) && Number.isFinite(lat) ? lat : fallbackLat;
+  const safeLng = typeof lng === 'number' && !Number.isNaN(lng) && Number.isFinite(lng) ? lng : fallbackLng;
+  const clampedLat = Math.max(-90, Math.min(90, safeLat));
+  const clampedLng = Math.max(-180, Math.min(180, safeLng));
+  return { lat: clampedLat, lng: clampedLng };
+}
+
 /**
  * Calculates straight-line distance in kilometers between two geo-coordinates
- * using the Haversine formula.
+ * using the Haversine formula, with automatic sanitization.
  */
 export function calculateDistanceKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const p1 = sanitizeCoordinate(lat1, lon1);
+  const p2 = sanitizeCoordinate(lat2, lon2);
+
   const R = 6371; // Earth's radius in km
-  const dLat = ((lat2 - lat1) * Math.PI) / 180;
-  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const dLat = ((p2.lat - p1.lat) * Math.PI) / 180;
+  const dLon = ((p2.lng - p1.lng) * Math.PI) / 180;
   const a =
     Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos((lat1 * Math.PI) / 180) *
-      Math.cos((lat2 * Math.PI) / 180) *
+    Math.cos((p1.lat * Math.PI) / 180) *
+      Math.cos((p2.lat * Math.PI) / 180) *
       Math.sin(dLon / 2) *
       Math.sin(dLon / 2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R * c;
+  const dist = R * c;
+  return Number.isNaN(dist) ? 0 : dist;
 }
 
 /**

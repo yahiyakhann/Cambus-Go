@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useTransport } from '../context/TransportContext';
-import { CampusMap } from './CampusMap';
-import { calculateETA, formatDistance, getRemainingDistanceToStop } from '../utils/geo';
+import { useNavigation } from '../context/NavigationContext';
+import { calculateETA, formatDistance, getRemainingDistanceToStop, calculateDistanceKm } from '../utils/geo';
 import {
   Clock,
   Bus,
@@ -10,7 +10,10 @@ import {
   Bell,
   CheckCircle2,
   Radio,
-  ArrowDown,
+  Compass,
+  MapPin,
+  GraduationCap,
+  ArrowRight,
 } from 'lucide-react';
 
 export const StudentView: React.FC = () => {
@@ -22,8 +25,11 @@ export const StudentView: React.FC = () => {
     selectStop,
     setAlertDistance,
   } = useTransport();
+  const { navigate } = useNavigation();
 
   const [secondsAgo, setSecondsAgo] = useState<number>(12);
+  const [gpsError, setGpsError] = useState<string | null>(null);
+  const [gpsSuccess, setGpsSuccess] = useState<string | null>(null);
 
   // Find active route and student's selected bus
   const currentRoute = routes.find((r) => r.id === student.selectedRouteId) || routes[0];
@@ -34,6 +40,42 @@ export const StudentView: React.FC = () => {
 
   const currentStop =
     currentRoute.stops.find((s) => s.id === student.selectedStopId) || currentRoute.stops[0];
+
+  const handleUseDeviceLocation = () => {
+    setGpsError(null);
+    setGpsSuccess(null);
+    if (typeof navigator === 'undefined' || !navigator.geolocation) {
+      setGpsError('Geolocation is not supported by your browser environment.');
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const userLat = pos.coords.latitude;
+        const userLng = pos.coords.longitude;
+        let nearest = currentRoute.stops[0];
+        let minDist = Infinity;
+        currentRoute.stops.forEach((s) => {
+          const d = calculateDistanceKm(userLat, userLng, s.lat, s.lng);
+          if (d < minDist) {
+            minDist = d;
+            nearest = s;
+          }
+        });
+        selectStop(nearest.id);
+        setGpsSuccess(`Nearest stop detected: ${nearest.name} (~${Math.round(minDist * 1000)}m)`);
+        setTimeout(() => setGpsSuccess(null), 5000);
+      },
+      (err) => {
+        if (err.code === 1) {
+          setGpsError('Location permission denied. Switched to manual stop selection.');
+        } else {
+          setGpsError('Unable to retrieve GPS coordinates. Switched to campus preset.');
+        }
+      },
+      { timeout: 7000, enableHighAccuracy: true }
+    );
+  };
 
   // Calculate distance and ETA to student's selected stop
   const remainingDistanceKm = assignedBus
@@ -85,6 +127,37 @@ export const StudentView: React.FC = () => {
 
   return (
     <div id="student-view-container" className="space-y-6">
+      {/* Student Portal Header Banner */}
+      <div className="bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 rounded-2xl p-5 sm:p-6 shadow-xs flex flex-wrap items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-xs">
+            <GraduationCap className="w-5 h-5" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight">
+                Student Transit Portal
+              </h1>
+              <span className="px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider bg-blue-50 dark:bg-blue-950/80 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                Student Dashboard
+              </span>
+            </div>
+            <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mt-0.5">
+              Personal Commuter Schedule, Boarding Stop Arrival Countdown & Notification Alerts
+            </p>
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => navigate('/track')}
+          className="px-4 py-2 rounded-xl bg-blue-50 dark:bg-blue-950/80 hover:bg-blue-100 dark:hover:bg-blue-900/80 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-colors"
+        >
+          <MapPin className="w-3.5 h-3.5 text-blue-600" />
+          <span>Open Track Map</span>
+        </button>
+      </div>
+
       {/* Route & Boarding Stop Selectors Header Card */}
       <div className="bg-white border border-slate-200/90 rounded-2xl p-4 sm:p-5 shadow-xs">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -112,12 +185,23 @@ export const StudentView: React.FC = () => {
 
           {/* Select My Boarding Stop */}
           <div>
-            <label
-              htmlFor="student-stop-selector"
-              className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2"
-            >
-              My Boarding Stop
-            </label>
+            <div className="flex items-center justify-between mb-2">
+              <label
+                htmlFor="student-stop-selector"
+                className="block text-xs font-bold text-slate-500 uppercase tracking-wider"
+              >
+                My Boarding Stop
+              </label>
+              <button
+                type="button"
+                onClick={handleUseDeviceLocation}
+                className="text-xs font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1 cursor-pointer transition-colors"
+                title="Detect Nearest Stop using GPS"
+              >
+                <Compass className="w-3.5 h-3.5" />
+                <span>Auto-Detect Nearest</span>
+              </button>
+            </div>
             <select
               id="student-stop-selector"
               value={student.selectedStopId}
@@ -132,7 +216,34 @@ export const StudentView: React.FC = () => {
             </select>
           </div>
         </div>
+
+        {/* GPS Location Alerts */}
+        {gpsError && (
+          <div className="mt-3 p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs flex items-center gap-2">
+            <AlertTriangle className="w-4 h-4 shrink-0 text-amber-600" />
+            <span>{gpsError}</span>
+          </div>
+        )}
+        {gpsSuccess && (
+          <div className="mt-3 p-3 rounded-xl bg-teal-50 border border-teal-200 text-teal-800 text-xs flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 shrink-0 text-teal-600" />
+            <span>{gpsSuccess}</span>
+          </div>
+        )}
       </div>
+
+      {/* Stale GPS Signal Warning if no update in >30s */}
+      {secondsAgo > 30 && (
+        <div className="bg-amber-50 border border-amber-300 rounded-2xl p-4 flex items-center gap-3 text-amber-900 text-xs shadow-xs">
+          <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0" />
+          <div className="flex-1">
+            <span className="font-bold">Notice — Stale GPS Telemetry: </span>
+            <span>
+              The transit unit has not broadcasted a telemetry ping in {secondsAgo} seconds. Displaying last confirmed coordinates.
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* Emergency Alert Banner */}
       {isEmergency && (
@@ -228,11 +339,11 @@ export const StudentView: React.FC = () => {
 
             <button
               type="button"
-              onClick={handleScrollToMap}
+              onClick={() => navigate('/track')}
               className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer min-h-[40px]"
             >
-              <span>View Live Map</span>
-              <ArrowDown className="w-3.5 h-3.5" />
+              <MapPin className="w-3.5 h-3.5" />
+              <span>Open Track Map</span>
             </button>
           </div>
         </div>
@@ -348,22 +459,31 @@ export const StudentView: React.FC = () => {
         </div>
       </div>
 
-      {/* Live Campus Vector Map Section */}
-      <div id="student-live-map-section" className="bg-white border border-slate-200/90 rounded-2xl p-4 sm:p-5 shadow-xs space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <div className="w-2.5 h-2.5 rounded-full bg-teal-500 animate-pulse" />
-            <h3 className="text-sm font-bold text-slate-900">Live Campus Tracking Map</h3>
-            <span className="text-xs text-slate-500">
-              • Tracking {assignedBus?.busNumber} ({currentRoute.code})
-            </span>
+      {/* Dedicated Track Map Action Card */}
+      <div className="bg-gradient-to-r from-blue-900 to-indigo-900 text-white rounded-3xl p-6 sm:p-7 shadow-lg flex flex-col sm:flex-row items-center justify-between gap-5">
+        <div className="space-y-1 text-center sm:text-left">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-500/20 text-blue-200 text-xs font-bold uppercase tracking-wider border border-blue-400/30">
+            <MapPin className="w-3.5 h-3.5 text-blue-300" />
+            <span>Dedicated Campus Telemetry</span>
           </div>
-          <span className="text-xs text-slate-500 font-medium">
-            Next Stop: {nextStopObj.name}
-          </span>
+          <h3 className="text-xl font-black tracking-tight mt-1">
+            Looking for the Full Campus Track Map?
+          </h3>
+          <p className="text-xs text-blue-200/90 max-w-xl leading-relaxed">
+            Switch to the dedicated Track Map module to observe all campus transit corridors, inspect live GIS bus coordinates, and toggle multi-route filters.
+          </p>
         </div>
 
-        <CampusMap highlightStopId={currentStop.id} focusBusId={assignedBus?.id} />
+        <button
+          type="button"
+          id="student-open-track-map-btn"
+          onClick={() => navigate('/track')}
+          className="px-6 py-3.5 rounded-2xl bg-white hover:bg-blue-50 text-blue-900 font-extrabold text-sm shadow-md transition-all hover:scale-105 cursor-pointer flex items-center gap-2 shrink-0"
+        >
+          <MapPin className="w-4 h-4 text-blue-600" />
+          <span>Launch Track Map</span>
+          <ArrowRight className="w-4 h-4 text-blue-600" />
+        </button>
       </div>
     </div>
   );

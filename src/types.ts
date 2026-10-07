@@ -122,3 +122,16 @@ export interface TransitSystemSettings {
   liveSyncIntervalSeconds: number;
   maintenanceMode: boolean;
 }
+
+export interface SecurityAuditLog {
+  id: string;
+  timestamp: number;
+  isoTime?: string;
+  attemptedRoute: string;
+  userRole: UserRole | 'guest';
+  userId?: string;
+  userEmail?: string;
+  action: 'UNAUTHORIZED_NAVIGATION_ATTEMPT' | 'BLOCKED_ACCESS';
+  reason: string;
+  severity?: 'warning' | 'high' | 'critical';
+}

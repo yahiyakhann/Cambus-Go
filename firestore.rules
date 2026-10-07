@@ -1,0 +1,47 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper function to check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Helper function to check if user is admin
+    function isAdmin() {
+      return isAuthenticated() &&
+        (request.auth.token.email.matches('.*admin.*') ||
+         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'));
+    }
+
+    // User profiles
+    match /users/{userId} {
+      allow read: if true;
+      allow write: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+    }
+
+    // Live buses fleet
+    match /buses/{busId} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+    }
+
+    // Live transit corridor routes
+    match /routes/{routeId} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+    }
+
+    // System configuration & announcements
+    match /system_config/{configId} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+    }
+
+    // Broadcast alerts & notifications
+    match /alerts/{alertId} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+    }
+  }
+}

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useTransport } from '../context/TransportContext';
+import { useAuth } from '../context/AuthContext';
 import { CampusMap } from './CampusMap';
 import { UserManager } from './UserManager';
 import { ContentSettingsManager } from './ContentSettingsManager';
@@ -14,6 +15,10 @@ import {
   CheckCircle2,
   Sliders,
   AlertTriangle,
+  ShieldAlert,
+  FileText,
+  Trash2,
+  Lock,
 } from 'lucide-react';
 
 export const AdminView: React.FC = () => {
@@ -28,7 +33,9 @@ export const AdminView: React.FC = () => {
     selectRoute,
   } = useTransport();
 
-  const [activeTab, setActiveTab] = useState<'live_fleet' | 'routes' | 'users' | 'settings'>('live_fleet');
+  const { auditLogs, clearAuditLogs } = useAuth();
+
+  const [activeTab, setActiveTab] = useState<'live_fleet' | 'routes' | 'users' | 'settings' | 'security_audit'>('live_fleet');
   const [selectedFleetBusId, setSelectedFleetBusId] = useState<string>(buses[0]?.id || 'bus_1');
 
   const activeBuses = buses.filter((b) => b.isTripActive);
@@ -147,6 +154,30 @@ export const AdminView: React.FC = () => {
             }`}
           >
             System & Configuration
+          </button>
+          <button
+            type="button"
+            id="admin-security-audit-tab"
+            onClick={() => setActiveTab('security_audit')}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+              activeTab === 'security_audit'
+                ? 'bg-blue-600 text-white shadow-xs'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+            }`}
+          >
+            <ShieldAlert className="w-3.5 h-3.5" />
+            <span>Security & Compliance</span>
+            {auditLogs.length > 0 && (
+              <span
+                className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
+                  activeTab === 'security_audit'
+                    ? 'bg-white text-blue-700'
+                    : 'bg-red-500 text-white'
+                }`}
+              >
+                {auditLogs.length}
+              </span>
+            )}
           </button>
         </div>
 
@@ -396,6 +427,167 @@ export const AdminView: React.FC = () => {
 
       {/* TAB 4: SYSTEM & CONFIGURATION */}
       {activeTab === 'settings' && <ContentSettingsManager />}
+
+      {/* TAB 5: SECURITY COMPLIANCE AUDIT */}
+      {activeTab === 'security_audit' && (
+        <div className="space-y-6">
+          {/* Header Card */}
+          <div className="bg-white border border-slate-200/90 rounded-2xl p-5 sm:p-6 shadow-xs flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-red-600 text-white flex items-center justify-center shadow-xs">
+                <ShieldAlert className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-xl font-black text-slate-900 tracking-tight">
+                    Security Compliance Audit Log
+                  </h3>
+                  <span className="px-2 py-0.5 rounded bg-red-100 text-red-800 text-[10px] font-bold uppercase border border-red-200">
+                    Audit Service Active
+                  </span>
+                </div>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Monitors unauthorized navigation attempts to protected corridors ('/buses') stored in AuthContext session data.
+                </p>
+              </div>
+            </div>
+
+            {auditLogs.length > 0 && (
+              <button
+                type="button"
+                onClick={clearAuditLogs}
+                className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-red-50 text-slate-700 hover:text-red-700 text-xs font-bold border border-slate-300 hover:border-red-300 flex items-center gap-1.5 cursor-pointer transition-colors"
+                title="Clear audit session logs"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Clear Session Log</span>
+              </button>
+            )}
+          </div>
+
+          {/* Metrics summary */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+            <div className="p-4 rounded-2xl bg-white border border-slate-200/90 shadow-xs">
+              <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
+                Total Incursions Logged
+              </div>
+              <div className="text-2xl font-black text-slate-900">
+                {auditLogs.length}
+              </div>
+              <div className="text-xs text-slate-500 mt-0.5">
+                Session audit security events
+              </div>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-white border border-slate-200/90 shadow-xs">
+              <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
+                '/buses' Incursions
+              </div>
+              <div className="text-2xl font-black text-red-600">
+                {auditLogs.filter((l) => l.attemptedRoute === '/buses').length}
+              </div>
+              <div className="text-xs text-slate-500 mt-0.5">
+                Unauthorized attempts blocked
+              </div>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-white border border-slate-200/90 shadow-xs">
+              <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
+                Compliance Status
+              </div>
+              <div className="text-xl font-bold text-teal-700 flex items-center gap-1.5">
+                <CheckCircle2 className="w-5 h-5 text-teal-600" />
+                <span>100% Policy Enforced</span>
+              </div>
+              <div className="text-xs text-slate-500 mt-0.5">
+                Role boundaries strictly respected
+              </div>
+            </div>
+          </div>
+
+          {/* Audit Logs List */}
+          <div className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-xs">
+            <div className="flex items-center justify-between pb-3 mb-4 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <FileText className="w-4 h-4 text-slate-500" />
+                <h4 className="text-sm font-bold text-slate-900">
+                  Logged Unauthorized Route Incursions
+                </h4>
+              </div>
+              <span className="text-xs text-slate-500 font-mono">
+                {auditLogs.length} entries recorded
+              </span>
+            </div>
+
+            {auditLogs.length === 0 ? (
+              <div className="py-12 text-center space-y-2">
+                <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-teal-50 text-teal-600">
+                  <CheckCircle2 className="w-6 h-6" />
+                </div>
+                <h5 className="text-sm font-bold text-slate-800">
+                  No Unauthorized Navigation Attempts Logged
+                </h5>
+                <p className="text-xs text-slate-500 max-w-md mx-auto">
+                  All navigation requests have adhered to designated role privileges. Any unauthorized attempt by a Student to access '/buses' will immediately be recorded here.
+                </p>
+              </div>
+            ) : (
+              <div className="divide-y divide-slate-100 space-y-3">
+                {auditLogs.map((log) => (
+                  <div
+                    key={log.id}
+                    className="pt-3 first:pt-0 flex flex-col md:flex-row md:items-center justify-between gap-3"
+                  >
+                    <div className="space-y-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="px-2 py-0.5 rounded font-mono text-[11px] font-bold bg-red-100 text-red-800 border border-red-200">
+                          {log.attemptedRoute}
+                        </span>
+                        <span className="px-2 py-0.5 rounded text-[11px] font-bold uppercase bg-amber-100 text-amber-900 border border-amber-200">
+                          Role: {log.userRole}
+                        </span>
+                        {log.severity && (
+                          <span
+                            className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                              log.severity === 'high' || log.severity === 'critical'
+                                ? 'bg-rose-100 text-rose-800 border border-rose-200'
+                                : 'bg-slate-100 text-slate-700 border border-slate-200'
+                            }`}
+                          >
+                            {log.severity}
+                          </span>
+                        )}
+                        <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-slate-100 text-slate-700">
+                          {log.action}
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-700 font-medium">
+                        {log.reason}
+                      </p>
+                      <div className="text-[11px] text-slate-400 font-mono">
+                        User: {log.userEmail || log.userId || 'anonymous'} • ID: {log.id}
+                      </div>
+                    </div>
+
+                    <div className="text-right shrink-0">
+                      <span className="text-xs font-mono text-slate-500">
+                        {new Date(log.timestamp).toLocaleTimeString([], {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                          second: '2-digit',
+                        })}
+                      </span>
+                      <div className="text-[10px] text-slate-400">
+                        {new Date(log.timestamp).toLocaleDateString()}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
